@@ -16,7 +16,7 @@ function IsClientLoaded(player: Player)
 	return player:GetAttribute("LoadedService_Loaded") == true
 end
 
-function LoadedService.ClientLoaded(player: Player)
+function LoadedService:ClientLoaded(player: Player)
 	local loaded = Future.Try(function(player: Player)
 		while not IsClientLoaded(player) do
 			if player.Parent == nil then

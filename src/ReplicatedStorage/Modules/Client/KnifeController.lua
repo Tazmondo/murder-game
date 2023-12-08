@@ -1,0 +1,3 @@
+local KnifeController = {}
+
+return KnifeController
