@@ -22,10 +22,12 @@
       "$ignoreUnknownInstances": true,
       "$path": "src/ServerStorage"
     },
-    "StarterPlayerScripts": {
-      "$className": "StarterPlayerScripts",
-      "$ignoreUnknownInstances": true,
-      "$path": "src/StarterPlayer/StarterPlayerScripts"
+    "StarterPlayer": {
+      "StarterPlayerScripts": {
+        "$className": "StarterPlayerScripts",
+        "$ignoreUnknownInstances": true,
+        "$path": "src/StarterPlayerScripts"
+      }
     },
     "Workspace": {
       "$className": "Workspace",
