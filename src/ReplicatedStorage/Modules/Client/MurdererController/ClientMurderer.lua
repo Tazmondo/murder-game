@@ -95,11 +95,11 @@ function InputEnded(input: InputObject, processed: boolean)
 			raycastParams.FilterDescendantsInstances = { activeMurderer.character.model }
 
 			local raycast = workspace:Raycast(ray.Origin, maxRayDirection, raycastParams)
-			local endPosition = if raycast then raycast.Position else ray.Origin + maxRayDirection
+			local endPosition = if raycast then raycast.Position else ray.Origin + ray.Direction * 50
 
 			local origin = CFrame.lookAt(activeMurderer.character.HRP.Position, endPosition)
 
-			KnifeThrow:Throw(origin, activeMurderer.knife)
+			KnifeThrow:Throw(origin, activeMurderer.knife, activeMurderer.character)
 
 			-- So that the animation snaps back
 			activeMurderer.animations.throw:AdjustWeight(0.001, 0.05)
