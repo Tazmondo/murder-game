@@ -2,24 +2,51 @@ local MurdererController = {}
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local ClientMurderer = require(script.ClientMurderer)
 local KnifeThrow = require(script.KnifeThrow)
 local CharacterUtil = require(ReplicatedStorage.Modules.Shared.CharacterUtil)
 local Config = require(ReplicatedStorage.Modules.Shared.Config)
 local Types = require(ReplicatedStorage.Modules.Shared.Types)
 
+local ReplicateAnimationEvent = require(ReplicatedStorage.Events.Murderer.ReplicateAnimationEvent):Client()
 local ReplicateKnifeHitEvent = require(ReplicatedStorage.Events.Murderer.ReplicateKnifeHitEvent):Client()
 local ReplicateKnifeThrowEvent = require(ReplicatedStorage.Events.Murderer.ReplicateKnifeThrowEvent):Client()
 
 local animationFolder = ReplicatedStorage.Assets.Animations
-local knifeThrowAnimation = assert(animationFolder.KnifeThrow, "No knife throw animation")
-local knifeHoldAnimation = assert(animationFolder.KnifeHold, "No knife hold found")
+local knifeHoldAnimation = animationFolder.KnifeHold
+local throwPose = animationFolder.KnifeThrowPose
 
 local otherMurderers: { [Player]: Types.LocalMurderer? } = {}
 
 local knifeModel = assert(ReplicatedStorage.Assets.Knife, "No knife model found!") :: Types.KnifeModel
 assert(knifeModel.Handle, "Knife had no handle!")
 assert(knifeModel.Handle.Grip, "Knife handle had no grip!")
+
+function GetPoseData(character: Model, rootPose: Pose): Types.PoseData
+	local motors = {}
+	for i, descendant in character:GetDescendants() do
+		if descendant:IsA("Motor6D") then
+			local part1 = descendant.Part1
+			if part1 then
+				motors[part1.Name] = descendant
+			end
+		end
+	end
+
+	local poseData = {}
+	for i, pose in rootPose:GetDescendants() do
+		if pose:IsA("Pose") then
+			local motor = motors[pose.Name]
+			if not motor then
+				warn("Missing motor:", pose.Name)
+			end
+			poseData[motor] = pose.CFrame
+		end
+	end
+
+	return poseData
+end
 
 function MakeMurderer(player: Player)
 	print("Making", player, "a murderer")
@@ -47,12 +74,23 @@ function MakeMurderer(player: Player)
 
 	knife.Parent = character.model
 
+	local throw = character.animator:LoadAnimation(knifeThrowAnimation)
+
+	local hold = character.animator:LoadAnimation(knifeHoldAnimation)
+
+	hold:Play()
+	throw:Play()
+	throw:AdjustWeight(0.01)
+	throw:AdjustSpeed(0)
+
 	local data: Types.LocalMurderer = {
-		lastThrown = 0,
+		lastHeld = 0,
 		knife = knife,
 		character = character,
 		knifeMap = {},
 		knifeId = 0,
+		throwPose = GetPoseData(character.model, throwPose),
+		holding = false,
 	}
 
 	if player == Players.LocalPlayer then
@@ -93,7 +131,7 @@ function HandleReplicateKnifeThrow(murderer: Player, origin: CFrame, id: number)
 	state.knifeMap[id] = globalId
 end
 
-function HandlereplicateKnifeHit(murderer: Player, id: number, didHitPlayer: boolean)
+function HandleReplicateKnifeHit(murderer: Player, id: number, didHitPlayer: boolean)
 	local state = otherMurderers[murderer]
 	if not state then
 		return
@@ -110,6 +148,20 @@ function HandlereplicateKnifeHit(murderer: Player, id: number, didHitPlayer: boo
 	end
 end
 
+function HandleAnimationEvent(murderer: Player, holding: boolean)
+	local state = otherMurderers[murderer]
+	if not state then
+		return
+	end
+
+	state.holding = holding
+	if holding then
+		state.lastHeld = os.clock()
+	else
+		state.throwTrack:AdjustWeight(0.01)
+	end
+end
+
 function PlayerAdded(player: Player)
 	HandleMurdererAttributeChanged(player)
 
@@ -118,9 +170,22 @@ function PlayerAdded(player: Player)
 	end)
 end
 
+function PreAnimation()
+	for i, murderer in otherMurderers do
+		assert(murderer)
+		if murderer.holding then
+			local throwProgress = math.clamp((os.clock() - murderer.lastHeld) / Config.ThrowTime, 0.01, 1)
+			murderer.throwTrack:AdjustWeight(throwProgress)
+		end
+	end
+end
+
 function MurdererController:Initialize()
 	ReplicateKnifeThrowEvent:On(HandleReplicateKnifeThrow)
-	ReplicateKnifeHitEvent:On(HandlereplicateKnifeHit)
+	ReplicateKnifeHitEvent:On(HandleReplicateKnifeHit)
+	ReplicateAnimationEvent:On(HandleAnimationEvent)
+
+	RunService.PreAnimation:Connect(PreAnimation)
 
 	Players.PlayerAdded:Connect(PlayerAdded)
 	for _, player in Players:GetPlayers() do

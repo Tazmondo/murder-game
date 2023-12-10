@@ -1,19 +1,16 @@
 local CharacterUtil = require(script.Parent.CharacterUtil)
-
 export type LocalMurderer = {
-	lastThrown: number,
 	knife: KnifeModel,
 	character: CharacterUtil.Character,
 	knifeMap: { [number]: number },
+	throwPose: PoseData,
+	lastHeld: number,
+	holding: boolean,
 }
 
 export type ClientMurderer = LocalMurderer & {
-	lastClicked: number,
-	holding: boolean,
 	knifeId: number,
-	animations: {
-		throw: AnimationTrack,
-	},
+	lastThrown: number,
 }
 
 export type KnifeModel = Model & {
@@ -21,5 +18,7 @@ export type KnifeModel = Model & {
 		Grip: Attachment,
 	},
 }
+
+export type PoseData = { [Motor6D]: CFrame }
 
 return {}
