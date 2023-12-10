@@ -1,0 +1,7 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local InstanceGuards = require(ReplicatedStorage.Modules.Shared.InstanceGuards)
+local Guard = require(ReplicatedStorage.Packages.Guard)
+local Red = require(ReplicatedStorage.Packages.Red)
+return Red.Event("Murderer_ReplicateKnifeThrow", function(murderer, origin, knifeId)
+	return InstanceGuards.Player(murderer), Guard.CFrame(origin), Guard.Number(knifeId)
+end)

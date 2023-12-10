@@ -6,6 +6,10 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local KnifeThrow = require(script.Parent.KnifeThrow)
 local CharacterUtil = require(ReplicatedStorage.Modules.Shared.CharacterUtil)
+local Config = require(ReplicatedStorage.Modules.Shared.Config)
+local Types = require(ReplicatedStorage.Modules.Shared.Types)
+
+local ThrowKnifeEvent = require(ReplicatedStorage.Events.Murderer.ThrowKnifeEvent):Client()
 
 local animationFolder = ReplicatedStorage.Assets.Animations
 local knifeThrowAnimation = assert(animationFolder.KnifeThrow, "No knife throw animation")
@@ -13,41 +17,37 @@ local knifeHoldAnimation = assert(animationFolder.KnifeHold, "No knife hold foun
 
 local THROWTIME = 0.5
 local THROWALPHA = 0.8 -- Progress through throw time that releasing will result in a throw
-local THROWCOOLDOWN = 2
 
-type MurdererData = {
-	animations: {
-		throw: AnimationTrack,
-	},
-	lastClicked: number,
-	lastThrown: number,
-	holding: boolean,
-	knife: Model,
-	character: CharacterUtil.Character,
-}
-
-local activeMurderer: MurdererData? = nil
+local activeMurderer: Types.ClientMurderer? = nil
 
 function ClientMurderer:ClearMurderer()
 	activeMurderer = nil
 end
 
-function ClientMurderer:InitializeMurderer(character: CharacterUtil.Character, knife: Model)
+function ClientMurderer:InitializeMurderer(
+	character: CharacterUtil.Character,
+	knife: Model,
+	baseData: Types.LocalMurderer
+)
 	local throw = character.animator:LoadAnimation(knifeThrowAnimation)
 	local hold = character.animator:LoadAnimation(knifeHoldAnimation)
+
 	hold:Play()
 	throw:Play()
-	throw:AdjustWeight(0.001)
+	throw:AdjustWeight(0.01)
+	throw:AdjustSpeed(0)
 
 	activeMurderer = {
 		animations = {
 			throw = throw,
 		},
+		lastThrown = baseData.lastThrown,
+		knife = baseData.knife,
+		character = baseData.character,
+		knifeMap = baseData.knifeMap,
 		lastClicked = 0,
-		lastThrown = 0,
 		holding = false,
-		knife = knife,
-		character = character,
+		knifeId = 0,
 	}
 
 	Players.LocalPlayer.CharacterRemoving:Once(ClientMurderer.ClearMurderer)
@@ -55,8 +55,8 @@ function ClientMurderer:InitializeMurderer(character: CharacterUtil.Character, k
 end
 
 -- For getting length of time held down including down time during the throw cooldown
-function GetCooldownHoldTime(activeMurderer: MurdererData)
-	local cooldownEnd = activeMurderer.lastThrown + THROWCOOLDOWN
+function GetCooldownHoldTime(activeMurderer: Types.ClientMurderer)
+	local cooldownEnd = activeMurderer.lastThrown + Config.ThrowCooldown
 	local cooldownHeld = math.max(0, cooldownEnd - activeMurderer.lastClicked)
 	local heldTime = os.clock() - activeMurderer.lastClicked - cooldownHeld
 
@@ -71,7 +71,6 @@ function InputBegan(input: InputObject, processed: boolean)
 	if input.UserInputType == Enum.UserInputType.MouseButton1 then
 		activeMurderer.holding = true
 		activeMurderer.lastClicked = os.clock()
-		activeMurderer.animations.throw:Play()
 	end
 end
 
@@ -99,12 +98,18 @@ function InputEnded(input: InputObject, processed: boolean)
 
 			local origin = CFrame.lookAt(activeMurderer.character.HRP.Position, endPosition)
 
-			KnifeThrow:Throw(origin, activeMurderer.knife, activeMurderer.character)
+			activeMurderer.knifeId += 1
+
+			local globalKnifeId =
+				KnifeThrow:Throw(origin, activeMurderer.knife, activeMurderer.character, activeMurderer.knifeId)
+			activeMurderer.knifeMap[activeMurderer.knifeId] = globalKnifeId
+
+			ThrowKnifeEvent:Fire(origin)
 
 			-- So that the animation snaps back
-			activeMurderer.animations.throw:AdjustWeight(0.001, 0.05)
+			activeMurderer.animations.throw:AdjustWeight(0.01, 0.05)
 		else
-			activeMurderer.animations.throw:AdjustWeight(0.001, 0.1)
+			activeMurderer.animations.throw:AdjustWeight(0.01, 0.1)
 		end
 	end
 end
@@ -116,7 +121,8 @@ function PreAnimation(dt: number)
 
 	if activeMurderer.holding then
 		local throwProgress = math.clamp(GetCooldownHoldTime(activeMurderer) / THROWTIME, 0, 1)
-		activeMurderer.animations.throw:AdjustWeight(throwProgress, 0.1)
+		local animationProgress = math.clamp(throwProgress, 0.01, 1) -- Can't set weight to 0 or anim will break
+		activeMurderer.animations.throw:AdjustWeight(animationProgress)
 	end
 end
 

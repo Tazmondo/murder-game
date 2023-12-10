@@ -3,23 +3,28 @@ local MurdererController = {}
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ClientMurderer = require(script.ClientMurderer)
+local KnifeThrow = require(script.KnifeThrow)
 local CharacterUtil = require(ReplicatedStorage.Modules.Shared.CharacterUtil)
 local Config = require(ReplicatedStorage.Modules.Shared.Config)
+local Types = require(ReplicatedStorage.Modules.Shared.Types)
 
-type Knife = Model & {
-	Handle: BasePart & {
-		Grip: Attachment,
-	},
-}
+local ReplicateKnifeHitEvent = require(ReplicatedStorage.Events.Murderer.ReplicateKnifeHitEvent):Client()
+local ReplicateKnifeThrowEvent = require(ReplicatedStorage.Events.Murderer.ReplicateKnifeThrowEvent):Client()
 
-local knifeModel = assert(ReplicatedStorage.Assets.Knife, "No knife model found!") :: Knife
+local animationFolder = ReplicatedStorage.Assets.Animations
+local knifeThrowAnimation = assert(animationFolder.KnifeThrow, "No knife throw animation")
+local knifeHoldAnimation = assert(animationFolder.KnifeHold, "No knife hold found")
+
+local otherMurderers: { [Player]: Types.LocalMurderer? } = {}
+
+local knifeModel = assert(ReplicatedStorage.Assets.Knife, "No knife model found!") :: Types.KnifeModel
 assert(knifeModel.Handle, "Knife had no handle!")
 assert(knifeModel.Handle.Grip, "Knife handle had no grip!")
 
 function MakeMurderer(player: Player)
 	print("Making", player, "a murderer")
 
-	local character = CharacterUtil:GetCharacter(player)
+	local character = CharacterUtil:GetCharacterFromPlayer(player)
 	if not character then
 		warn("Tried to make a player without a character a murderer")
 		return
@@ -42,8 +47,32 @@ function MakeMurderer(player: Player)
 
 	knife.Parent = character.model
 
+	local data: Types.LocalMurderer = {
+		lastThrown = 0,
+		knife = knife,
+		character = character,
+		knifeMap = {},
+		knifeId = 0,
+	}
+
 	if player == Players.LocalPlayer then
-		ClientMurderer:InitializeMurderer(character, knife)
+		ClientMurderer:InitializeMurderer(character, knife, data)
+	else
+		otherMurderers[player] = data
+		player.CharacterRemoving:Once(function()
+			ClearMurderer(player)
+		end)
+		character.humanoid.Died:Once(function()
+			ClearMurderer(player)
+		end)
+	end
+end
+
+function ClearMurderer(player: Player)
+	local state = otherMurderers[player]
+	if state then
+		state.knife:Destroy()
+		otherMurderers[player] = nil
 	end
 end
 
@@ -54,14 +83,45 @@ function HandleMurdererAttributeChanged(player: Player)
 	end
 end
 
+function HandleReplicateKnifeThrow(murderer: Player, origin: CFrame, id: number)
+	local state = otherMurderers[murderer]
+	if not state then
+		return
+	end
+
+	local globalId = KnifeThrow:Throw(origin, state.knife, state.character, id)
+	state.knifeMap[id] = globalId
+end
+
+function HandlereplicateKnifeHit(murderer: Player, id: number, didHitPlayer: boolean)
+	local state = otherMurderers[murderer]
+	if not state then
+		return
+	end
+
+	local globalKnife = state.knifeMap[id]
+	if not globalKnife then
+		return
+	end
+
+	-- Only delete knife if it hit a player, as server will handle player ragdolls
+	if didHitPlayer then
+		KnifeThrow:DeleteKnife(id)
+	end
+end
+
 function PlayerAdded(player: Player)
 	HandleMurdererAttributeChanged(player)
+
 	player:GetAttributeChangedSignal(Config.MurdererAttribute):Connect(function()
 		HandleMurdererAttributeChanged(player)
 	end)
 end
 
 function MurdererController:Initialize()
+	ReplicateKnifeThrowEvent:On(HandleReplicateKnifeThrow)
+	ReplicateKnifeHitEvent:On(HandlereplicateKnifeHit)
+
 	Players.PlayerAdded:Connect(PlayerAdded)
 	for _, player in Players:GetPlayers() do
 		PlayerAdded(player)
