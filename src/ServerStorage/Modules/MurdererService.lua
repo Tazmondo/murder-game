@@ -135,11 +135,17 @@ function MurdererService:Initialize()
 
 	KnifeHitEvent:On(HandleKnifeHitEvent)
 
+	-- TODO: Remove
 	task.spawn(function()
-		function a(player)
-			player.CharacterAdded:Wait()
-			LoadedService:ClientLoaded(player):Await()
-			MurdererService:MakeMurderer(player)
+		local function a(player)
+			local function b(char)
+				LoadedService:ClientLoaded(player):Await()
+				MurdererService:MakeMurderer(player)
+			end
+			player.CharacterAdded:Connect(b)
+			if player.Character then
+				b(player.Character)
+			end
 		end
 		Players.PlayerAdded:Connect(a)
 		for i, p in Players:GetPlayers() do
