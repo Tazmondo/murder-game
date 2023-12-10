@@ -23,18 +23,15 @@ function ClientMurderer:InitializeMurderer(
 	knife: Model,
 	baseData: Types.LocalMurderer
 )
-	local newMurderer: Types.ClientMurderer = {
-		knife = baseData.knife,
-		character = baseData.character,
-		knifeMap = baseData.knifeMap,
-		throwTrack = baseData.throwTrack,
-		lastHeld = baseData.lastHeld,
-		holding = baseData.holding,
+	local additions: Types.ClientMurdererAdditions = {
 		lastThrown = 0,
 		knifeId = 0,
 	}
+	for key, value in pairs(additions) do
+		baseData[key] = value
+	end
 
-	activeMurderer = newMurderer
+	activeMurderer = baseData :: Types.ClientMurderer
 
 	Players.LocalPlayer.CharacterRemoving:Once(ClientMurderer.ClearMurderer)
 	character.humanoid.Died:Once(ClientMurderer.ClearMurderer)
@@ -93,25 +90,20 @@ function InputEnded(input: InputObject, processed: boolean)
 			activeMurderer.knifeMap[activeMurderer.knifeId] = globalKnifeId
 
 			ThrowKnifeEvent:Fire(origin)
-
-			-- So that the animation snaps back
-			activeMurderer.throwTrack:AdjustWeight(0.01, 0.05)
-		else
-			activeMurderer.throwTrack:AdjustWeight(0.01, 0.1)
 		end
 	end
 end
 
 function PreAnimation(dt: number)
-	if not activeMurderer then
-		return
-	end
+	-- if not activeMurderer then
+	-- 	return
+	-- end
 
-	if activeMurderer.holding then
-		local throwProgress = math.clamp(GetCooldownHoldTime(activeMurderer) / Config.ThrowTime, 0, 1)
-		local animationProgress = math.clamp(throwProgress, 0.01, 1) -- Can't set weight to 0 or anim will break
-		activeMurderer.throwTrack:AdjustWeight(animationProgress, 0.1)
-	end
+	-- if activeMurderer.holding then
+	-- 	local throwProgress = math.clamp(GetCooldownHoldTime(activeMurderer) / Config.ThrowTime, 0, 1)
+	-- 	local animationProgress = math.clamp(throwProgress, 0.01, 1) -- Can't set weight to 0 or anim will break
+	-- 	activeMurderer.throwTrack:AdjustWeight(animationProgress, 0.1)
+	-- end
 end
 
 function ClientMurderer:Initialize()

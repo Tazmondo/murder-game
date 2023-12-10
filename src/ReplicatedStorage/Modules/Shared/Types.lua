@@ -8,10 +8,11 @@ export type LocalMurderer = {
 	holding: boolean,
 }
 
-export type ClientMurderer = LocalMurderer & {
+export type ClientMurdererAdditions = {
 	knifeId: number,
 	lastThrown: number,
 }
+export type ClientMurderer = LocalMurderer & ClientMurdererAdditions
 
 export type KnifeModel = Model & {
 	Handle: BasePart & {
