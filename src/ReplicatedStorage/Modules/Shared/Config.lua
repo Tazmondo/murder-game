@@ -5,8 +5,6 @@ local Config = {
 	-- MURDERER --
 	MurdererAttribute = "Murderer_IsMurderer",
 	ThrowCooldown = 1,
-	ThrowTime = 0.5, -- Time taken to fully wind up knife
-	ThrowAlpha = 0.95, -- Progress through throw time that releasing will result in a throw
 
 	-- Time before knives in the air disappear
 	KnifeTimeout = 30,

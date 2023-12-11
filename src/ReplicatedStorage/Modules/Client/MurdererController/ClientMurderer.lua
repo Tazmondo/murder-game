@@ -10,7 +10,13 @@ local Config = require(ReplicatedStorage.Modules.Shared.Config)
 local Types = require(ReplicatedStorage.Modules.Shared.Types)
 
 local ThrowKnifeEvent = require(ReplicatedStorage.Events.Murderer.ThrowKnifeEvent):Client()
-local UpdateAnimationEvent = require(ReplicatedStorage.Events.Murderer.UpdateAnimationEvent):Client()
+
+local animationFolder = ReplicatedStorage.Assets.Animations
+local knifeThrowAnimation = assert(animationFolder.KnifeThrow, "No knife throw animation")
+local knifeHoldAnimation = assert(animationFolder.KnifeHold, "No knife hold found")
+
+local THROWTIME = 0.5
+local THROWALPHA = 0.8 -- Progress through throw time that releasing will result in a throw
 
 local activeMurderer: Types.ClientMurderer? = nil
 
@@ -23,18 +29,26 @@ function ClientMurderer:InitializeMurderer(
 	knife: Model,
 	baseData: Types.LocalMurderer
 )
-	local newMurderer: Types.ClientMurderer = {
+	local throw = character.animator:LoadAnimation(knifeThrowAnimation)
+	local hold = character.animator:LoadAnimation(knifeHoldAnimation)
+
+	hold:Play()
+	throw:Play()
+	throw:AdjustWeight(0.01)
+	throw:AdjustSpeed(0)
+
+	activeMurderer = {
+		animations = {
+			throw = throw,
+		},
+		lastThrown = baseData.lastThrown,
 		knife = baseData.knife,
 		character = baseData.character,
 		knifeMap = baseData.knifeMap,
-		throwTrack = baseData.throwTrack,
-		lastHeld = baseData.lastHeld,
-		holding = baseData.holding,
-		lastThrown = 0,
+		lastClicked = 0,
+		holding = false,
 		knifeId = 0,
 	}
-
-	activeMurderer = newMurderer
 
 	Players.LocalPlayer.CharacterRemoving:Once(ClientMurderer.ClearMurderer)
 	character.humanoid.Died:Once(ClientMurderer.ClearMurderer)
@@ -43,8 +57,8 @@ end
 -- For getting length of time held down including down time during the throw cooldown
 function GetCooldownHoldTime(activeMurderer: Types.ClientMurderer)
 	local cooldownEnd = activeMurderer.lastThrown + Config.ThrowCooldown
-	local cooldownHeld = math.max(0, cooldownEnd - activeMurderer.lastHeld)
-	local heldTime = os.clock() - activeMurderer.lastHeld - cooldownHeld
+	local cooldownHeld = math.max(0, cooldownEnd - activeMurderer.lastClicked)
+	local heldTime = os.clock() - activeMurderer.lastClicked - cooldownHeld
 
 	return heldTime
 end
@@ -55,9 +69,8 @@ function InputBegan(input: InputObject, processed: boolean)
 	end
 
 	if input.UserInputType == Enum.UserInputType.MouseButton1 then
-		UpdateAnimationEvent:Fire(true)
 		activeMurderer.holding = true
-		activeMurderer.lastHeld = os.clock()
+		activeMurderer.lastClicked = os.clock()
 	end
 end
 
@@ -68,10 +81,9 @@ function InputEnded(input: InputObject, processed: boolean)
 
 	if input.UserInputType == Enum.UserInputType.MouseButton1 then
 		activeMurderer.holding = false
-		UpdateAnimationEvent:Fire(false)
 
 		-- User held down button for long enough to throw the knife
-		if GetCooldownHoldTime(activeMurderer) >= (Config.ThrowTime * Config.ThrowAlpha) then
+		if GetCooldownHoldTime(activeMurderer) >= (THROWTIME * THROWALPHA) then
 			activeMurderer.lastThrown = os.clock()
 			local ray = workspace.CurrentCamera:ScreenPointToRay(input.Position.X, input.Position.Y)
 
@@ -95,9 +107,9 @@ function InputEnded(input: InputObject, processed: boolean)
 			ThrowKnifeEvent:Fire(origin)
 
 			-- So that the animation snaps back
-			activeMurderer.throwTrack:AdjustWeight(0.01, 0.05)
+			activeMurderer.animations.throw:AdjustWeight(0.01, 0.05)
 		else
-			activeMurderer.throwTrack:AdjustWeight(0.01, 0.1)
+			activeMurderer.animations.throw:AdjustWeight(0.01, 0.1)
 		end
 	end
 end
@@ -108,9 +120,9 @@ function PreAnimation(dt: number)
 	end
 
 	if activeMurderer.holding then
-		local throwProgress = math.clamp(GetCooldownHoldTime(activeMurderer) / Config.ThrowTime, 0, 1)
+		local throwProgress = math.clamp(GetCooldownHoldTime(activeMurderer) / THROWTIME, 0, 1)
 		local animationProgress = math.clamp(throwProgress, 0.01, 1) -- Can't set weight to 0 or anim will break
-		activeMurderer.throwTrack:AdjustWeight(animationProgress, 0.1)
+		activeMurderer.animations.throw:AdjustWeight(animationProgress)
 	end
 end
 

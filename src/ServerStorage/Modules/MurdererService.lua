@@ -2,13 +2,10 @@ local MurdererService = {}
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
 local CharacterUtil = require(ReplicatedStorage.Modules.Shared.CharacterUtil)
 local Config = require(ReplicatedStorage.Modules.Shared.Config)
 local LoadedService = require(script.Parent.LoadedService)
 
-local UpdateAnimationEvent = require(ReplicatedStorage.Events.Murderer.UpdateAnimationEvent):Server()
-local ReplicateAnimationEvent = require(ReplicatedStorage.Events.Murderer.ReplicateAnimationEvent):Server()
 local ReplicateKnifeHitEvent = require(ReplicatedStorage.Events.Murderer.ReplicateKnifeHitEvent):Server()
 local ReplicateKnifeThrowEvent = require(ReplicatedStorage.Events.Murderer.ReplicateKnifeThrowEvent):Server()
 local ThrowKnifeEvent = require(ReplicatedStorage.Events.Murderer.ThrowKnifeEvent):Server()
@@ -131,16 +128,12 @@ function HandleKnifeHitEvent(
 	murdererState.knives[knifeId] = nil
 end
 
-function HandleUpdateAnimationEvent(player: Player, holding: boolean)
-	ReplicateAnimationEvent:FireAllExcept(player, player, holding)
-end
-
 function MurdererService:Initialize()
 	Players.PlayerRemoving:Connect(PlayerRemoving)
 
 	ThrowKnifeEvent:On(HandleKnifeThrowEvent)
+
 	KnifeHitEvent:On(HandleKnifeHitEvent)
-	UpdateAnimationEvent:On(HandleUpdateAnimationEvent)
 
 	-- TODO: Remove
 	task.spawn(function()

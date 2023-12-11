@@ -1,7 +1,0 @@
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local InstanceGuards = require(ReplicatedStorage.Modules.Shared.InstanceGuards)
-local Guard = require(ReplicatedStorage.Packages.Guard)
-local Red = require(ReplicatedStorage.Packages.Red)
-return Red.Event("Murderer_ReplicateAnimation", function(murderer, holding)
-	return InstanceGuards.Player(murderer), Guard.Boolean(holding)
-end)
