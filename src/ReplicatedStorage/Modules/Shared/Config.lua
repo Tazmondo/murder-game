@@ -3,7 +3,6 @@ local Config = {
 	LatencyVariation = 0.1,
 
 	-- MURDERER --
-	MurdererAttribute = "Murderer_IsMurderer",
 	ThrowCooldown = 1,
 
 	-- Time before knives in the air disappear

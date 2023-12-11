@@ -5,15 +5,11 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ClientMurderer = require(script.ClientMurderer)
 local KnifeThrow = require(script.KnifeThrow)
 local CharacterUtil = require(ReplicatedStorage.Modules.Shared.CharacterUtil)
-local Config = require(ReplicatedStorage.Modules.Shared.Config)
 local Types = require(ReplicatedStorage.Modules.Shared.Types)
 
+local CreateMurdererEvent = require(ReplicatedStorage.Events.Murderer.CreateMurdererEvent):Client()
 local ReplicateKnifeHitEvent = require(ReplicatedStorage.Events.Murderer.ReplicateKnifeHitEvent):Client()
 local ReplicateKnifeThrowEvent = require(ReplicatedStorage.Events.Murderer.ReplicateKnifeThrowEvent):Client()
-
-local animationFolder = ReplicatedStorage.Assets.Animations
-local knifeThrowAnimation = assert(animationFolder.KnifeThrow, "No knife throw animation")
-local knifeHoldAnimation = assert(animationFolder.KnifeHold, "No knife hold found")
 
 local otherMurderers: { [Player]: Types.LocalMurderer? } = {}
 
@@ -76,13 +72,6 @@ function ClearMurderer(player: Player)
 	end
 end
 
-function HandleMurdererAttributeChanged(player: Player)
-	local isMurderer = player:GetAttribute(Config.MurdererAttribute)
-	if isMurderer then
-		MakeMurderer(player)
-	end
-end
-
 function HandleReplicateKnifeThrow(murderer: Player, origin: CFrame, id: number)
 	local state = otherMurderers[murderer]
 	if not state then
@@ -110,22 +99,14 @@ function HandlereplicateKnifeHit(murderer: Player, id: number, didHitPlayer: boo
 	end
 end
 
-function PlayerAdded(player: Player)
-	HandleMurdererAttributeChanged(player)
-
-	player:GetAttributeChangedSignal(Config.MurdererAttribute):Connect(function()
-		HandleMurdererAttributeChanged(player)
-	end)
+function HandleCreateMurdererEvent(murderer: Player)
+	MakeMurderer(murderer)
 end
 
 function MurdererController:Initialize()
 	ReplicateKnifeThrowEvent:On(HandleReplicateKnifeThrow)
 	ReplicateKnifeHitEvent:On(HandlereplicateKnifeHit)
-
-	Players.PlayerAdded:Connect(PlayerAdded)
-	for _, player in Players:GetPlayers() do
-		PlayerAdded(player)
-	end
+	CreateMurdererEvent:On(HandleCreateMurdererEvent)
 end
 
 MurdererController:Initialize()

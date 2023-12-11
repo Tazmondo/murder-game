@@ -6,6 +6,7 @@ local CharacterUtil = require(ReplicatedStorage.Modules.Shared.CharacterUtil)
 local Config = require(ReplicatedStorage.Modules.Shared.Config)
 local LoadedService = require(script.Parent.LoadedService)
 
+local CreateMurdererEvent = require(ReplicatedStorage.Events.Murderer.CreateMurdererEvent):Server()
 local ReplicateKnifeHitEvent = require(ReplicatedStorage.Events.Murderer.ReplicateKnifeHitEvent):Server()
 local ReplicateKnifeThrowEvent = require(ReplicatedStorage.Events.Murderer.ReplicateKnifeThrowEvent):Server()
 local ThrowKnifeEvent = require(ReplicatedStorage.Events.Murderer.ThrowKnifeEvent):Server()
@@ -24,14 +25,6 @@ type Murderer = {
 
 local murderers: { [Player]: Murderer? } = {}
 
-function SetMurdererAttribute(player: Player, enabled: boolean)
-	if enabled then
-		player:SetAttribute(Config.MurdererAttribute, true)
-	else
-		player:SetAttribute(Config.MurdererAttribute, nil)
-	end
-end
-
 function MurdererService:MakeMurderer(player: Player)
 	print("Making", player, "a murderer")
 
@@ -41,11 +34,7 @@ function MurdererService:MakeMurderer(player: Player)
 		knifeId = 0,
 	}
 
-	SetMurdererAttribute(player, true)
-end
-
-function PlayerRemoving(player: Player)
-	murderers[player] = nil
+	CreateMurdererEvent:FireAll(player)
 end
 
 function HandleKnifeThrowEvent(player: Player, origin: CFrame)
@@ -128,30 +117,35 @@ function HandleKnifeHitEvent(
 	murdererState.knives[knifeId] = nil
 end
 
+function PlayerRemoving(player: Player)
+	murderers[player] = nil
+end
+
+function PlayerAdded(player: Player)
+	local function charAdded(char)
+		LoadedService:ClientLoaded(player):Await()
+		MurdererService:MakeMurderer(player)
+	end
+
+	for murderer, state in murderers do
+		CreateMurdererEvent:Fire(player, murderer)
+	end
+
+	player.CharacterAdded:Connect(charAdded)
+	if player.Character then
+		charAdded(player.Character)
+	end
+end
+
 function MurdererService:Initialize()
+	Players.PlayerAdded:Connect(PlayerAdded)
 	Players.PlayerRemoving:Connect(PlayerRemoving)
-
 	ThrowKnifeEvent:On(HandleKnifeThrowEvent)
-
 	KnifeHitEvent:On(HandleKnifeHitEvent)
 
-	-- TODO: Remove
-	task.spawn(function()
-		local function a(player)
-			local function b(char)
-				LoadedService:ClientLoaded(player):Await()
-				MurdererService:MakeMurderer(player)
-			end
-			player.CharacterAdded:Connect(b)
-			if player.Character then
-				b(player.Character)
-			end
-		end
-		Players.PlayerAdded:Connect(a)
-		for i, p in Players:GetPlayers() do
-			a(p)
-		end
-	end)
+	for i, player in Players:GetPlayers() do
+		PlayerAdded(player)
+	end
 end
 
 MurdererService:Initialize()

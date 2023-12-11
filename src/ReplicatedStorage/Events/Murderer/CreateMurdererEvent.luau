@@ -1,0 +1,6 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local InstanceGuards = require(ReplicatedStorage.Modules.Shared.InstanceGuards)
+local Red = require(ReplicatedStorage.Packages.Red)
+return Red.Event("Murderer_CreateMurderer", function(murderer)
+	return InstanceGuards.Player(murderer)
+end)
