@@ -12,7 +12,7 @@ local Types = require(ReplicatedStorage.Modules.Shared.Types)
 local ThrowKnifeEvent = require(ReplicatedStorage.Events.Murderer.ThrowKnifeEvent):Client()
 
 local animationFolder = ReplicatedStorage.Assets.Animations
-local knifeThrowAnimation = assert(animationFolder.KnifeThrow, "No knife throw animation")
+local knifeThrowAnimation = assert(animationFolder.LongKnifeThrow, "No knife throw animation")
 local knifeHoldAnimation = assert(animationFolder.KnifeHold, "No knife hold found")
 
 local THROWTIME = 0.5
@@ -33,9 +33,13 @@ function ClientMurderer:InitializeMurderer(
 	local hold = character.animator:LoadAnimation(knifeHoldAnimation)
 
 	hold:Play()
-	throw:Play()
-	throw:AdjustWeight(0.01)
-	throw:AdjustSpeed(0)
+
+	throw.Stopped:Connect(function()
+		if throw.TimePosition == throw.Length then
+			throw:Play(0, 1, 0)
+			throw.TimePosition = throw.Length - 0.01
+		end
+	end)
 
 	activeMurderer = {
 		animations = {
@@ -107,22 +111,26 @@ function InputEnded(input: InputObject, processed: boolean)
 			ThrowKnifeEvent:Fire(origin)
 
 			-- So that the animation snaps back
-			activeMurderer.animations.throw:AdjustWeight(0.01, 0.05)
+			activeMurderer.animations.throw:Stop(0.025)
 		else
-			activeMurderer.animations.throw:AdjustWeight(0.01, 0.1)
+			activeMurderer.animations.throw:Stop(0.2)
 		end
 	end
 end
 
-function PreAnimation(dt: number)
+function RenderStepped(dt: number)
 	if not activeMurderer then
 		return
 	end
 
-	if activeMurderer.holding then
-		local throwProgress = math.clamp(GetCooldownHoldTime(activeMurderer) / THROWTIME, 0, 1)
-		local animationProgress = math.clamp(throwProgress, 0.01, 1) -- Can't set weight to 0 or anim will break
-		activeMurderer.animations.throw:AdjustWeight(animationProgress)
+	if
+		activeMurderer.holding
+		and not activeMurderer.animations.throw.IsPlaying
+		and (os.clock() - activeMurderer.lastThrown) > Config.ThrowCooldown
+	then
+		local speed = activeMurderer.animations.throw.Length / THROWTIME
+
+		activeMurderer.animations.throw:Play(0.1, 1, speed)
 	end
 end
 
@@ -130,7 +138,7 @@ function ClientMurderer:Initialize()
 	UserInputService.InputBegan:Connect(InputBegan)
 	UserInputService.InputEnded:Connect(InputEnded)
 
-	RunService.PreAnimation:Connect(PreAnimation)
+	RunService.RenderStepped:Connect(RenderStepped)
 end
 
 ClientMurderer:Initialize()
