@@ -99,7 +99,7 @@ function PreSimulation(dt: number)
 			local instance = raycast.Instance :: BasePart
 			local staticKnifeCFrame = CFrame.new(raycast.Position - knife.origin.LookVector * 0.1)
 				* knife.origin.Rotation
-				* CFrame.Angles(math.rad(-90), 0, 0)
+				* CFrame.Angles(math.rad(-90), math.rad(180), 0)
 
 			knife.model:PivotTo(staticKnifeCFrame)
 			local weld = Instance.new("WeldConstraint")
